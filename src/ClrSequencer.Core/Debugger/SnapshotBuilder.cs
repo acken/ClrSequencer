@@ -45,7 +45,7 @@ namespace ClrSequencer.Core.Debugger
                 var scope = method.RootScope;
                 variables.AddRange(enumerateLocals(scope));
             }
-            catch
+            catch (Exception exception)
             {
             }
             return variables.ToArray();
