@@ -17,6 +17,12 @@ namespace ClrSequencer.Console
             foreach (var snapshot in process.Sequence)
             {
                 System.Console.WriteLine("{0}:{1}", snapshot.Position.File, snapshot.Position.LineStart);
+                var locals = "\t";
+                foreach (var parameter in snapshot.Parameters)
+                    locals += string.Format("{0}={1}, ", parameter.Name, parameter.Value);
+                foreach (var variable in snapshot.Variables)
+                    locals += string.Format("{0}={1}, ", variable.Name, variable.Value);
+                System.Console.WriteLine(locals);
             }
             System.Console.ReadLine();
         }
