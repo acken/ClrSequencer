@@ -14,15 +14,14 @@ namespace ClrSequencer.Core.Test.Debugger
         [Test]
         public void ShouldCreateSequence()
         {
-            var assembly = Path.GetFullPath("SomeSimpleConsoleApp.exe");
+            var assembly = Path.GetFullPath("DebugMe.exe");
             var arguments = "";
-            var file = @"C:\Users\sveina\src\DotNET\Private\SomeSimpleConsoleApp\SomeClass.cs";
-            var breakPoint = new Breakpoint(assembly, file, 11, 0);
+            var breakPoint = new Breakpoint(assembly, null, 0, 0);
 
             var process = new ClrProcess();
             process.Start(assembly, arguments, breakPoint);
 
-            Assert.AreEqual(14, process.Sequence.Length);
+            Assert.AreEqual(19, process.Sequence.Length);
         }
     }
 }

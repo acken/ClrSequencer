@@ -5,11 +5,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>9.0.30729</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{17770E79-3185-4BD8-8B31-84F81F1F8AB0}</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <ProjectGuid>{4B6DF7FE-342A-4407-9CF2-B70CF07321C3}</ProjectGuid>
+    <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ClrSequencer.Core.Test</RootNamespace>
-    <AssemblyName>ClrSequencer.Core.Test</AssemblyName>
+    <RootNamespace>DebugMe</RootNamespace>
+    <AssemblyName>DebugMe</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -31,10 +31,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="nunit.framework, Version=2.4.8.0, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\lib\NUnit\nunit.framework.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
@@ -49,18 +45,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Debugger\ClrProcessTest.cs" />
+    <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\ClrSequencer.Core\ClrSequencer.Core.csproj">
-      <Project>{FE2B27AA-A969-4E25-A7ED-1812C4CFD535}</Project>
-      <Name>ClrSequencer.Core</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\DebugMe\DebugMe.csproj">
-      <Project>{4B6DF7FE-342A-4407-9CF2-B70CF07321C3}</Project>
-      <Name>DebugMe</Name>
-    </ProjectReference>
+    <Compile Include="SomeClass.cs" />
+    <Compile Include="SomeMultiplier.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

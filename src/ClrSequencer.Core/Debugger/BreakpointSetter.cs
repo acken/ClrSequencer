@@ -18,18 +18,36 @@ namespace ClrSequencer.Core.Debugger
 
         public void Set(CorModule module, ISymbolReader reader)
         {
+            if (_breakpoint.File == null)
+            {
+                setBreakpointThroughModule(module, reader);
+                return;
+            }
+            setBreakpointThroughDocument(module, reader);
+        }
+
+        private bool hasNoApplicationEntryPoint(SymbolToken token)
+        {
+            return token.GetToken() == 0;
+        }
+
+        private void setBreakpointThroughDocument(CorModule module, ISymbolReader reader)
+        {
             foreach (var doc in reader.GetDocuments())
             {
                 if (attemptSetBreakpoint(reader, doc, module))
                     return;
             }
-            setBreakpointThroughModule(module);
         }
 
-        private void setBreakpointThroughModule(CorModule module)
+        private void setBreakpointThroughModule(CorModule module, ISymbolReader reader)
         {
-            var func = module.GetFunctionFromToken(1);
-            var br = func.CreateBreakpoint();
+            var token = reader.UserEntryPoint;
+            if (hasNoApplicationEntryPoint(token))
+                return;
+            var method = reader.GetMethod(token);
+            var function = module.GetFunctionFromToken(method.Token.GetToken());
+            var br = function.CreateBreakpoint();
             br.Activate(true);
         }
 
