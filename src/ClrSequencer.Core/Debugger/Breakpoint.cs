@@ -5,7 +5,7 @@ using System.Text;
 
 namespace ClrSequencer.Core.Debugger
 {
-    class Breakpoint
+    public class Breakpoint
     {
         public string Assembly { get; private set; }
         public string File { get; private set; }

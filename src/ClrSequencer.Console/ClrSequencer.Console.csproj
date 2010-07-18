@@ -5,11 +5,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>9.0.30729</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{FE2B27AA-A969-4E25-A7ED-1812C4CFD535}</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <ProjectGuid>{2FD7F238-BA1E-4474-9A49-8E5F431C68DC}</ProjectGuid>
+    <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ClrSequencer.Core</RootNamespace>
-    <AssemblyName>ClrSequencer.Core</AssemblyName>
+    <RootNamespace>ClrSequencer.Console</RootNamespace>
+    <AssemblyName>ClrSequencer.Console</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -31,10 +31,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="MdbgCore, Version=0.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\Bin\MdbgCore.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
@@ -49,17 +45,14 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Debugger\BreakpointSetter.cs" />
-    <Compile Include="Debugger\Breakpoint.cs" />
-    <Compile Include="Debugger\ClrProcess.cs" />
-    <Compile Include="Debugger\Position.cs" />
-    <Compile Include="Debugger\SequencePoint.cs" />
-    <Compile Include="Debugger\SequencePointFactory.cs" />
-    <Compile Include="Debugger\Snapshot.cs" />
-    <Compile Include="Debugger\SnapshotBuilder.cs" />
-    <Compile Include="Debugger\Stepper.cs" />
-    <Compile Include="Debugger\SymbolLoader.cs" />
+    <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ClrSequencer.Core\ClrSequencer.Core.csproj">
+      <Project>{FE2B27AA-A969-4E25-A7ED-1812C4CFD535}</Project>
+      <Name>ClrSequencer.Core</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

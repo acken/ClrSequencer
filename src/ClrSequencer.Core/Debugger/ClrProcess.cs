@@ -7,12 +7,18 @@ using Microsoft.Samples.Debugging.CorDebug;
 using System.Diagnostics.SymbolStore;
 using Microsoft.Samples.Debugging.CorDebug.NativeApi;
 using System.IO;
+using Microsoft.Samples.Debugging.CorMetadata;
+using Microsoft.Samples.Debugging.CorSymbolStore;
+using System.Runtime.InteropServices;
+using System.Reflection;
 
 namespace ClrSequencer.Core.Debugger
 {
-    class ClrProcess
+    public class ClrProcess
     {
         private const int HIDDEN_LINE = 0xfeefee;
+
+        private SequencePointFactory _sequencePointFactory = new SequencePointFactory();
 
         private string _assembly;
         private Breakpoint _breakpoint;
@@ -22,263 +28,130 @@ namespace ClrSequencer.Core.Debugger
         private CorThread _activeThread;
         private List<KeyValuePair<string, ISymbolReader>> _symbolReaders = new List<KeyValuePair<string, ISymbolReader>>();
 
+        private List<Snapshot> _sequence = new List<Snapshot>();
+
+        public Snapshot[] Sequence { get { return _sequence.ToArray(); } }
+
         public void Start(string assembly, string arguments, Breakpoint breakpoint)
         {
             _assembly = assembly;
             _breakpoint = breakpoint;
-            createDebugger(arguments);
+            prepareDebugger(arguments);
             debug();
-        }
-
-        private void _process_OnCreateAppDomain(object sender, CorAppDomainEventArgs e)
-        {
-            e.AppDomain.Attach();
-        }
-
-        void _process_OnModuleLoad(object sender, CorModuleEventArgs e)
-        {
-            initializeReaderAndSetBreakpoint(e);
-        }
-
-        private void _process_OnProcessExit(object sender, CorProcessEventArgs e)
-        {
-            _terminateEvent.Set();
-        }
-
-        private void _process_OnBreakpoint(object sender, CorBreakpointEventArgs e)
-        {
-            e.Continue = false;
-            _activeThread = e.Thread;
-            _breakEvent.Set();
-        }
-
-        private void _process_OnStepComplete(object sender, CorStepCompleteEventArgs e)
-        {
-            e.Continue = false;
-            _activeThread = e.Thread;
-            _breakEvent.Set();
-        }
-
-        private void _process_OnDebuggerError(object sender, CorDebuggerErrorEventArgs e)
-        {
-            throw new NotImplementedException();
-        }
-
-        private void createDebugger(string arguments)
-        {
-            var debugger = new CorDebugger(CorDebugger.GetDefaultDebuggerVersion());
-            _process = debugger.CreateProcess(_assembly, arguments);
-            _process.OnCreateAppDomain += new CorAppDomainEventHandler(_process_OnCreateAppDomain);
-            _process.OnModuleLoad += new CorModuleEventHandler(_process_OnModuleLoad);
-            _process.OnProcessExit += new CorProcessEventHandler(_process_OnProcessExit);
-            _process.OnBreakpoint += new BreakpointEventHandler(_process_OnBreakpoint);
-            _process.OnStepComplete += new StepCompleteEventHandler(_process_OnStepComplete);
-            _process.OnDebuggerError += new DebuggerErrorEventHandler(_process_OnDebuggerError);
         }
 
         private void debug()
         {
-            var handles = wireUpResetEvents();
+            var events = prepareResetEvents();
+
             while (true)
             {
-                int handle = wait(handles);
-                if (isTerminateEvent(handle))
+                _process.Continue(false);
+                int resetEvent = waitForDebugger(events);
+                if (isTerminateEvent(resetEvent))
                     break;
-                stepIn();
+                takeSnapshot();
+                step();
             }
         }
 
-        private WaitHandle[] wireUpResetEvents()
+        private void takeSnapshot()
+        {
+            var builder = new SnapshotBuilder(_activeThread, _symbolReaders);
+            var snapshot = builder.Build();
+            if (snapshot != null)
+                _sequence.Add(snapshot);
+        }
+
+        private bool isTerminateEvent(int resetEvent)
+        {
+            return resetEvent == 0;
+        }
+
+        private int waitForDebugger(WaitHandle[] handles)
+        {
+            return WaitHandle.WaitAny(handles);
+        }
+
+        private WaitHandle[] prepareResetEvents()
         {
             _terminateEvent = new AutoResetEvent(false);
             _breakEvent = new AutoResetEvent(false);
-            var handles = new WaitHandle[2];
+            WaitHandle[] handles = new WaitHandle[2];
             handles[0] = _terminateEvent;
             handles[1] = _breakEvent;
             return handles;
         }
 
-        private int wait(WaitHandle[] handles)
+        private void prepareDebugger(string arguments)
         {
-            _process.Continue(false);
-            return WaitHandle.WaitAny(handles);
+            var debugger = new CorDebugger(CorDebugger.GetDefaultDebuggerVersion());
+            _process = debugger.CreateProcess(_assembly, arguments);
+
+            _process.OnCreateAppDomain += new CorAppDomainEventHandler(process_OnCreateAppDomain);
+            _process.OnProcessExit += new CorProcessEventHandler(process_OnProcessExit);
+            _process.OnBreakpoint += new BreakpointEventHandler(process_OnBreakpoint);
+            _process.OnStepComplete += new StepCompleteEventHandler(_process_OnStepComplete);
+            _process.OnModuleLoad += new CorModuleEventHandler(_process_OnModuleLoad);
+            _process.OnDebuggerError += new DebuggerErrorEventHandler(_process_OnDebuggerError);
         }
 
-        private bool isTerminateEvent(int handle)
+        private void step()
         {
-            return handle == 0;
+            var stepper = new Stepper(_symbolReaders);
+            stepper.Step(_activeThread);
         }
 
-        private void stepIn()
+        void _process_OnDebuggerError(object sender, CorDebuggerErrorEventArgs e)
         {
-            var stepper = createStepper(_activeThread);
-            var mod = _activeThread.ActiveFrame.Function.Module;
-            if (!_symbolReaders.Exists(r => r.Key.Equals(mod.Name)))
-                stepper.Step(true);
-            else
-                stepInThroughIL(mod, stepper);
+            Marshal.ThrowExceptionForHR(e.HResult);
         }
 
-        private void stepInThroughIL(CorModule mod, CorStepper stepper)
-        {
-            var range = getStepRanges(_activeThread, _symbolReaders.Find(r => r.Key.Equals(mod.Name)).Value);
-            stepper.StepRange(true, range);
-        }
-
-        private static CorStepper createStepper(CorThread thread)
-        {
-            var stepper = thread.ActiveFrame.CreateStepper();
-            stepper.SetUnmappedStopMask(CorDebugUnmappedStop.STOP_NONE);
-            return stepper;
-        }
-
-        private static COR_DEBUG_STEP_RANGE[] getStepRanges(CorThread thread, ISymbolReader reader)
-        {
-            var frame = thread.ActiveFrame;
-            uint offset;
-            CorDebugMappingResult mapResult;
-            frame.GetIP(out offset, out mapResult);
-            var sequencePoint = getSequencePoint(frame, reader, offset);
-            if (sequencePoint != null)
-                return createStepRange(offset, sequencePoint.Offset);
-            return createStepRange(offset, frame.Function.ILCode.Size);
-        }
-
-        private static SequencePoint getSequencePoint(CorFrame frame, ISymbolReader reader, uint offset)
-        {
-            SequencePoint sequencePoint = null;
-            try
-            {
-                var method = reader.GetMethod(new SymbolToken(frame.FunctionToken));
-                sequencePoint = getSequencePoint(method, offset);
-            }
-            catch (Exception)
-            {
-                // If we can't get the symbol method do step thorugh ilcode
-            }
-            return sequencePoint;
-        }
-
-        private static SequencePoint getSequencePoint(ISymbolMethod method, uint offset)
-        {
-            foreach (var sp in getSequencePoints(method))
-            {
-                if (sp.Offset > offset)
-                    return sp;
-            }
-            return null;
-        }
-
-        private static COR_DEBUG_STEP_RANGE[] createStepRange(uint start, int end)
-        {
-            var range = new COR_DEBUG_STEP_RANGE[1];
-            range[0] = new COR_DEBUG_STEP_RANGE()
-            {
-                startOffset = (UInt32)start,
-                endOffset = (UInt32)end
-            };
-            return range;
-        }
-
-        private static SequencePoint[] getSequencePoints(ISymbolMethod method)
-        {
-            var sequencePoints = new List<SequencePoint>();
-            var sp_count = method.SequencePointCount;
-            var spOffsets = new int[sp_count];
-            var spDocs = new ISymbolDocument[sp_count];
-            var spStartLines = new int[sp_count];
-            var spEndLines = new int[sp_count];
-            var spStartCol = new int[sp_count];
-            var spEndCol = new int[sp_count];
-
-            method.GetSequencePoints(spOffsets, spDocs, spStartLines, spStartCol, spEndLines, spEndCol);
-
-            for (int i = 0; i < sp_count; i++)
-            {
-                if (spStartLines[i] != HIDDEN_LINE)
-                {
-                    sequencePoints.Add(new SequencePoint(spOffsets[i],
-                                                         spDocs[i],
-                                                         spStartLines[i],
-                                                         spStartCol[i],
-                                                         spEndLines[i],
-                                                         spEndCol[i]));
-                }
-            }
-            return sequencePoints.ToArray();
-        }
-
-        private void initializeReaderAndSetBreakpoint(CorModuleEventArgs e)
+        void _process_OnModuleLoad(object sender, CorModuleEventArgs e)
         {
             var module = e.Module;
-            var reader = getSymbolReader(module);
-            if (reader == null)
-                return;
-
-            if (e.Module.Name.Equals(_breakpoint.Assembly))
-            {
-
+            var reader = loadSymbolReader(module);
+            if (module.Name.Equals(_breakpoint.Assembly))
                 setBreakpoint(module, reader);
-            }
+        }
 
-            var func = e.Module.GetFunctionFromToken(1);
-            var br = func.CreateBreakpoint();
-            br.Activate(true);
+        private ISymbolReader loadSymbolReader(CorModule module)
+        {
+            var loader = new SymbolLoader();
+            var reader = loader.GetSymbolReader(module);
+            if (reader != null)
+                _symbolReaders.Add(new KeyValuePair<string, ISymbolReader>(module.Name, reader));
+            return reader;
         }
 
         private void setBreakpoint(CorModule module, ISymbolReader reader)
         {
-            foreach (var doc in reader.GetDocuments())
-            {
-                if (Path.GetFileName(doc.URL).Equals(Path.GetFileName(_breakpoint.File)))
-                    createBreakpoint(reader, doc, module);
-            }
+            var setter = new BreakpointSetter(_breakpoint);
+            setter.Set(module, reader);
         }
 
-        private void createBreakpoint(ISymbolReader reader, ISymbolDocument doc, CorModule module)
+        void _process_OnStepComplete(object sender, CorStepCompleteEventArgs e)
         {
-            int line = _breakpoint.Line;
-            line = doc.FindClosestLine(line);
-            var method = reader.GetMethodFromDocumentPosition(doc, line, _breakpoint.Column);
-            var function = module.GetFunctionFromToken(method.Token.GetToken());
-            if (setInIL(doc, line, method, function))
-                return;
-
-            var bp = function.CreateBreakpoint();
-            bp.Activate(true);
+            e.Continue = false;
+            _activeThread = e.Thread;
+            _breakEvent.Set();
         }
 
-        private bool setInIL(ISymbolDocument doc, int line, ISymbolMethod method, CorFunction function)
+        void process_OnBreakpoint(object sender, CorBreakpointEventArgs e)
         {
-            bool found = false;
-            foreach (var sp in getSequencePoints(method))
-            {
-                if (sp.Document.URL.Equals(doc.URL) && sp.LineStart.Equals(line))
-                {
-                    var bp = function.ILCode.CreateBreakpoint(sp.Offset);
-                    bp.Activate(true);
-                    found = true;
-                }
-            }
-            return found;
+            e.Continue = false;
+            _activeThread = e.Thread;
+            _breakEvent.Set();
         }
 
-        private ISymbolReader getSymbolReader(CorModule module)
+        void process_OnCreateAppDomain(object sender, CorAppDomainEventArgs e)
         {
-            ISymbolReader reader = null;
-            try
-            {
-                if (!module.IsDynamic && !module.IsInMemory)
-                {
-                    reader = getSymbolReader(module);
-                    _symbolReaders.Add(new KeyValuePair<string, ISymbolReader>(module.Name, reader));
-                }
-            }
-            catch (Exception)
-            {
-                reader = null;
-            }
-            return reader;
+            e.AppDomain.Attach();
+        }
+
+        void process_OnProcessExit(object sender, CorProcessEventArgs e)
+        {
+            _terminateEvent.Set();
         }
     }
 }
