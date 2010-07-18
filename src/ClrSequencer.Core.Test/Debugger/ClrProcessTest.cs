@@ -21,7 +21,7 @@ namespace ClrSequencer.Core.Test.Debugger
             var process = new ClrProcess();
             process.Start(assembly, arguments, breakPoint);
 
-            Assert.AreEqual(19, process.Sequence.Length);
+            Assert.AreEqual(23, process.Sequence.Length);
         }
     }
 }

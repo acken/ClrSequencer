@@ -9,7 +9,7 @@ namespace DebugMe
     {
         static void Main(string[] args)
         {
-            var someClass = new SomeClass();
+            var someClass = new SomeClass(33);
             someClass.ReturnString();
         }
     }

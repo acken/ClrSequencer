@@ -81,7 +81,7 @@ namespace ClrSequencer.Core.Debugger
             return variables.ToArray();
         }
 
-        private string _typename;
+        private CorElementType _typename;
 
         private object getValue(CorValue value)
         {
@@ -90,8 +90,7 @@ namespace ClrSequencer.Core.Debugger
             {
                 if (rv.IsNull)
                 {
-                    //_typename = rv.ExactType.Class.GetTypeInfo().Name;
-                    _typename = rv.ExactType.Class.ToString();
+                    _typename = rv.ExactType.Type;
                     return null;
                 }
                 return getValue(rv.Dereference());
@@ -134,15 +133,14 @@ namespace ClrSequencer.Core.Debugger
                 return value.CastToStringValue().String;
             else if (value.Type == CorElementType.ELEMENT_TYPE_VALUETYPE)
             {
-                return "unknown";
-                //var typeValue = value.ExactType.Class.GetTypeInfo().Name;
-                //if (typeMap.Exists(t => t.Value.Equals(_typename)))
-                //{
-                //    var gv = value.CastToGenericValue();
-                //    var unsafeValue = gv.UnsafeGetValueAsType(typeMap.Find(t => t.Value.Equals(_typename)).Key);
-                //}
-                //else
-                //    var objectValue = value.CastToObjectValue()
+                var typeValue = value.ExactType.Type;
+                if (typeMap.Exists(t => t.Value.Equals(_typename)))
+                {
+                    var gv = value.CastToGenericValue();
+                    return gv.UnsafeGetValueAsType(typeMap.Find(t => t.Value.Equals(_typename)).Key);
+                }
+                else
+                    return value.CastToObjectValue();
             }
             else if (new CorElementType[] {CorElementType.ELEMENT_TYPE_CLASS, CorElementType.ELEMENT_TYPE_OBJECT}.Contains(value.Type))
                 return new object(); //value.CastToObjectValue();
